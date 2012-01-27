@@ -34,18 +34,17 @@ import wnck
 import pyosd
 from Xlib.display import Display
 from Xlib import X, XK
+import Xlib.error
 import sys
 import operator
 
 # Config values
-font = "-monotype-arial-bold-r-normal--75-0-0-0-p-0-iso8859-15"
-colour = 'red'
-outline_colour = 'black'
+# font = "-monotype-arial-bold-r-normal--75-0-0-0-p-0-iso8859-15" # looks prettier but isn't installed everywhere.
 #
 
 timestamp = int(time.time())
 
-def display_osd():
+def display_osd(options):
     s = wnck.screen_get_default()
     s.force_update()
     windows = s.get_windows()
@@ -57,11 +56,11 @@ def display_osd():
 
     for i, window in enumerate(windows):
         if window.is_visible_on_workspace(ws):
-            osd = pyosd.osd(font)
+            osd = pyosd.osd(options.font)
             osd.set_timeout(-1)
-            osd.set_colour(colour)
+            osd.set_colour(options.colour)
             osd.set_outline_offset(1)
-            osd.set_outline_colour(outline_colour)
+            osd.set_outline_colour(options.outline_colour)
             osd.set_shadow_offset(2)
             x, y  = window.get_geometry()[:2]
             osd.set_horizontal_offset(x)
@@ -71,24 +70,55 @@ def display_osd():
             osds.append(osd)
     return osds, windows
 
-def main():
+def main(options):
     # current display
-    osds, windows = display_osd()
+    osds, windows = display_osd(options)
     disp = Display()
     root = disp.screen().root
-
+    catch = Xlib.error.CatchError(Xlib.error.BadAccess)
     # grab all lowercase key presses. No mechanism to change your mind and not jump.
     root.change_attributes(event_mask = X.KeyPressMask)
-    for keycode in [disp.keysym_to_keycode(XK.string_to_keysym(a)) for a in string.lowercase]:
-        root.grab_key(keycode, 0, 1, X.GrabModeAsync, X.GrabModeAsync)
+    all_keys = [name[3:] for name in dir(XK) if name[:3] == "XK_"]
+    for keycode in [disp.keysym_to_keycode(XK.string_to_keysym(a)) for a in all_keys]:
+        root.grab_key(keycode, 0, 1, X.GrabModeAsync, X.GrabModeAsync, catch)
 
     while True:
         event = root.display.next_event()
         keycode = event.detail
         if event.type == X.KeyPress:
             key = XK.keysym_to_string(disp.keycode_to_keysym(keycode, 0))
-            windows[string.lowercase.index(key)].activate(timestamp)
+            if key and key in string.lowercase and string.lowercase.index(key) < len(windows):
+                windows[string.lowercase.index(key)].activate(timestamp)
             sys.exit()
 
 if __name__ == '__main__':
-    main()
+    import optparse
+
+    parser = optparse.OptionParser(
+        usage = "%prog [options]",
+        description = "A Easy motion style window switcher."
+    )
+
+    parser.add_option("-f", "--font",
+        dest = "font",
+        help = """font specified in old style specification,
+as returned by xfontsel or xlsfonts. 
+If you're using a patched xosd, then you must use XFT font specs.""",
+        default = "-misc-fixed-bold-r-normal--50-0-100-100-c-0-iso8859-2"
+    )
+
+    parser.add_option("-c", "--colour",
+        dest = "colour",
+        help = "set text colour. In hex or X11 style words.",
+        default = 'red'
+    )
+
+    parser.add_option("-o","--outline",
+        dest = "outline_colour",
+        help = "set text outline colour. In hex or X11 style words.",
+        default = 'black'
+    )
+
+    (options, args) = parser.parse_args()
+
+    main(options)
