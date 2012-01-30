@@ -89,11 +89,11 @@ def main(options):
     with open(pid_file, 'w') as fp:
         fp.write(str(os.getpid()))
 
-    osds, windows = display_osd(options)
     disp = Display()
     root = disp.screen().root
     root.change_attributes(event_mask = X.KeyPressMask)
     root.grab_keyboard(False, X.GrabModeAsync, X.GrabModeAsync, X.CurrentTime)
+    osds, windows = display_osd(options)
 
     event = disp.next_event()
     keycode = event.detail
