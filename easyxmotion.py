@@ -34,7 +34,7 @@ import wnck
 import pyosd
 from Xlib.display import Display
 from Xlib import X, XK
-import sys
+import sys, os, signal
 import operator
 
 # Config values
@@ -71,6 +71,24 @@ def display_osd(options):
 
 def main(options):
     # current display
+    pid_file = '/var/lock/easyxmotion.pid'
+    # kill any old versions that are still running,
+    # we do it this way so the current one has input focus.
+    # might be a better way to just exit and give focus to the old one.
+    try:
+        with open(pid_file, 'r') as fp:
+            pid = int(fp.read())
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                #other isn't running
+                pass
+    except IOError:
+        # first ever run
+        pass
+    with open(pid_file, 'w') as fp:
+        fp.write(str(os.getpid()))
+
     osds, windows = display_osd(options)
     disp = Display()
     root = disp.screen().root
