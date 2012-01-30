@@ -34,7 +34,6 @@ import wnck
 import pyosd
 from Xlib.display import Display
 from Xlib import X, XK
-import Xlib.error
 import sys
 import operator
 
@@ -75,21 +74,17 @@ def main(options):
     osds, windows = display_osd(options)
     disp = Display()
     root = disp.screen().root
-    catch = Xlib.error.CatchError(Xlib.error.BadAccess)
-    # grab all lowercase key presses. No mechanism to change your mind and not jump.
     root.change_attributes(event_mask = X.KeyPressMask)
-    all_keys = [name[3:] for name in dir(XK) if name[:3] == "XK_"]
-    for keycode in [disp.keysym_to_keycode(XK.string_to_keysym(a)) for a in all_keys]:
-        root.grab_key(keycode, 0, 1, X.GrabModeAsync, X.GrabModeAsync, catch)
+    root.grab_keyboard(False, X.GrabModeAsync, X.GrabModeAsync, X.CurrentTime)
 
-    while True:
-        event = root.display.next_event()
-        keycode = event.detail
-        if event.type == X.KeyPress:
-            key = XK.keysym_to_string(disp.keycode_to_keysym(keycode, 0))
-            if key and key in string.lowercase and string.lowercase.index(key) < len(windows):
-                windows[string.lowercase.index(key)].activate(timestamp)
-            sys.exit()
+    event = disp.next_event()
+    keycode = event.detail
+    if event.type == X.KeyPress:
+        key = XK.keysym_to_string(disp.keycode_to_keysym(keycode, 0))
+        if key and key in string.lowercase and string.lowercase.index(key) < len(windows):
+            windows[string.lowercase.index(key)].activate(timestamp)
+        disp.ungrab_keyboard(X.CurrentTime)
+        sys.exit()
 
 if __name__ == '__main__':
     import optparse
